@@ -1,0 +1,286 @@
+Django笔记：
+
+第二章：url与视图
+
+	
+
+
+	url参数的转换器：
+			str：除了斜杠外都可以
+			int：只有数字可以
+			path：所有字符都满足
+			uuid： 只有满足"uuid.uuid4()"函数返回的字符串
+			slug：英文横杠，字母，下划线，数字
+
+
+
+
+	url模块化：
+		项目如果较大，就需要自己的urls 最后使用include函数包括进主urls中去 会将两个进行拼接
+
+
+
+	url命名：
+		不写死，便于以后修改，命令方法为 name=''
+			#views中方法省略了
+			urlpatterns=[
+						path('/login/',views.login,name='login')
+			]
+
+
+		应用命名空间：多个app之间，有可能产生同名url，可使用应用命名空间来区分
+					 要制定app_name="xxx "
+
+
+		重定向：多用于需要先登录的网站
+				views中：
+				from django.shortcuts import reverse ,redirect
+
+   				#这样就重定向到了/login/界面 现在是写死的 
+				return redirect('/login/')
+
+				#可以用他的name进行修改 不写死 这时候需要先进行反转（即通过name 找到对应的路径 如通过login 找到'/login/') 再重定向都可以
+				return redirect(reverse('login'))
+
+				#如果是多个app 则可能出现多个命名为 'login' 则我们需要在各自的APP中使用应用命名空间 如app_name="book"
+				#前面写上对应app_name 然后用":" 后面加上主要的name
+				return redirect(reverse('book:login'))
+
+
+
+				reverse函数：
+					如果在反转url时，需要添加参数，可以传递kwargs到reverse中 
+					urls中：
+						path('detail/<article_id>/',views.detail ,name=detail)
+					这时候需要传参数article_id 多个参数 则往字典中添加即可
+					views中：
+						detail_url=reverse('detail',kwargs={"article_id":1})
+
+					如果要查询字符串的参数，则需要手动拼接：
+						log_url=reverse('login')+'?next=/'
+						浏览器会显示'127.0.0.1:8000/login/next=/'
+
+
+
+		实例命名空间：(指定实例命令空间前必须先指定应用命名空间)
+			一个app可以创建多个实例，可以使用多个urls映射同一个app，反转的时候就会发生混淆
+			要是用实例命名空间 namespace
+			这是主urls：
+
+				urlpatterns=[
+							path('cms1/',include('cms.urls',namespace='cms1')),  1
+							path('cms2/',include('cms.urls',namespace='cms2'))    2
+				]
+
+			views中：
+				获取当前的namespace
+				current_namespce=request.resolver_match_namespace
+				然后进行反转 重定向
+				return redirect(reverse('%s:login')) %current_namespace
+
+
+			include多种写法：
+				上面1 2是一种  也可以写为：
+				path('cms/',include((pattern_list,app_namespace),namespace=None))
+
+				urlpatterns=[
+							path('cms/',include(（'cms.urls',app_namespace）,namespace=None))
+							
+				]
+
+
+				也可以包含一个path列表：include(path_list)
+				path('/movie',include([
+						path('',views.movie),
+						path('list/,views.movie_list'),
+						]))
+
+
+
+
+
+		re_path函数：
+			写url时可以使用正则表达式 推荐原生表达式 r''
+			在正则中定义组的名字使用？P<参数名>
+			re.path(r'^list/(?P<movie>\d{4})/')	 可以匹配到/list/2018/
+
+
+		url默认参数：
+			url映射指定默认参数，例如 path('',page=0，views.books) 这样访问主页就是第一页了 
+
+
+第三章：模板
+	
+
+	渲染模板：
+		html=render_to_string('index.html') 
+		return Httpresponse(html)
+		可直接替换为 render()函数 一步到位 
+
+	
+	模板路径：
+		会优先在项目下的templates下寻找文件，如果没有，会找此app中的templates，如果没有，会找其他app的templates
+
+	
+	模板变量：
+		在模板中使用变量 使用{{}}  
+		想要访问对象 可以通过{{对象.属性名}}
+		访问字典，列表，元组，都使用点 不用[]
+
+		views中使用context参数
+
+
+	模板标签：
+		if标签：
+			标签在{%%}中   闭合if标签{%endif%}  语法和python一致
+
+
+		for标签：
+			for ... in ... 标签:(正向遍历 反向遍历在persons后加reversed)
+				{%for person in persons%}
+				<p> {{person.name}} </p>
+				<%endfor%>
+
+			遍历字典使用keys，values，items方法 用'.'调用
+
+			for ... in ... empty 遍历对象没有元素时，会执行empty
+				{%for person in persons%}
+				<li> {{person}} </li>
+				{%empty%}
+				暂时还没有评论
+
+
+			for循环中的一些变量：
+				forloop.counter 当前循环的下标 1开始
+				forloop.counter0   0开始
+				forloop.revcounter 下标反循环 以1作为最后一个下标
+				forloop.revcounter0 以0作为最后一个下标
+				forloop.first 是否第一次遍历
+				forloop.last 是否最后一次遍历
+				forloop.parentloop 多层循环中代表上层循环
+
+		with标签：
+			{%with person=zs %}
+				<p>{{zs}}<p>
+			{%endwith%}
+
+			或者是：
+			{%with person as zs %}
+				<p>{{zs}}<p>
+			{%endwith%}
+
+		url标签：
+			类似django中的翻转reverse
+			urls中：
+				path('books/',views.book,name='book')
+			模板中：
+				<a href="{%url 'book' book_id=1 %}">图书</a>
+				<a>是可以点击的超链接， url使'book'通过name翻转成路径'books/' ,book_id为views.book函数中的参数，多个变量以空格分隔
+
+				如果要查询字符串的参数，则需要手动添加（'？next='为要找的字符串参数）：
+				<a href="{%url 'book' book_id=1 %}?next=">图书</a>
+
+
+		spaceless标签：
+			放在其中的标签 会去掉多余的空格
+
+
+		autospace标签：
+			context="<a href="www.baidu.com">百度</a>"
+			这样context变量传入模板 经过渲染后不会出现 百度按钮（可以点击的）因为autospace默认是关闭的
+
+
+		verbatim标签：
+			放在其中的内容  不会被解析，会保持原生内容
+	DTL过滤器：
+		django中无法给函数传递参数，这就需要过滤器，它最多只能用两个参数
+		
+		add过滤器：
+			{{value1|add:value2}} 会将value1+value2
+		
+		cut过滤器：
+			{{value1|cut:value2}} 会将value1中包含的value2去掉 
+
+		date过滤器：(显示日期)
+			{{today|date:"Y/m/d"}}
+
+		floatformat过滤器：
+			{{value|floatformat:3}} 保留三位小数
+
+		default过滤器：
+			如果value的布尔值为false 就为默认值
+			{{value|default:"xxx"}}
+
+		default_if_none过滤器：
+			如果value为none
+			{{value|default:"xxx"}}
+
+		first/last 过滤器：
+			如果value为元组，列表，字典，则取first/first
+			{{value|first/last}}
+
+		join过滤器：
+			{{value|join："/"}}
+			如果value是['a','b','c']  将输出a/b/c
+
+		length：
+			{{value|length}}
+			获取value的长度
+
+		lower：
+			{{value|lower}}
+			所有字符转小写
+
+		upper：
+			所有字符转大写
+
+		random：
+			{{value|random}}
+			从value中随机选择
+
+		safe：
+			{{value|safe}}
+			如果value是一串HTML代码 则会被执行 不会被转义
+
+		slice：
+			{{value|slice："2:"}}
+			从2开始切片
+
+		striptags：
+			{{value|striptags}}
+			如果value是<li>hello world </li> 则输出hello world
+
+		truncatechars：（不会切割标签名）
+			{{value|truncatechars：80}}
+			如果超过了80 则后面的显示为...  ...要占其中的三个字符
+
+		truncatechars_html：（会切割标签名）
+
+
+		自定义过滤器：
+			1.首先在app中新建一个包templatetags 
+			2.在包下面创建一个py文件
+			3.在文件中自定义过滤器 最多只能用两个参数
+			4.写完之后要是用django.template.library.filter注册
+			5.在模板中使用load标签加载过滤器
+			6.也可以写成过滤器 @register.filter('xxx')
+
+
+	模板优化：
+		使用include标签：
+		有些模板代码是重复的 所以可以单独抽取出来 再用include包括进去
+		传递参数 可以用with
+		{%include 'index.html' with usename='xxx'%}
+
+		模板继承：使用extends标签,放在第一行
+				{%entends 'base.html'%}
+				子模板的代码必须放在block标签中
+				可以使用{{block.super}}来实现子模板对父模板内容的访问
+
+		加载静态文件：
+			打开setting中的staticfile_dirs
+			在模板中使用static标签 ：
+			{%load static %}
+			{%static 。。。。%}
+
+
